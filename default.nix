@@ -81,7 +81,7 @@ in
       description = "mail-distributor Daemon";
       serviceConfig = {
         ExecStart = ''
-          ${mail-distributor}/bin/mail-distributor ${configDir}/configs
+          ${mail-distributor}/bin/mail-distributor ${configDir}
         '';
         Restart = "always";
         RestartSec = "5s";
