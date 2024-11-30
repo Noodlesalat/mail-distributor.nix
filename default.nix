@@ -14,10 +14,13 @@ let
   # YAML-Format für die Generierung der Configs
   configFormat = pkgs.formats.yaml {};
 
-  # Funktion zum Generieren der Config-Dateien pro mail-distributor
-  configFiles = mapAttrsToList (name: cfg:
-    configFormat.generate "${name}.yml" cfg
-  ) config.services.mail-distributor.config;
+  # Verzeichnis im Nix-Store für alle generierten Konfigurationsdateien
+  configDir = pkgs.runCommand "mail-distributor-configs" { buildInputs = [ pkgs.makeWrapper ]; } ''
+    mkdir -p $out/configs
+    ${concatMapStringsSep "\n" (name: ''
+      echo -n "${configFormat.generate "${name}.yml" (config.services.mail-distributor.config.${name})}" > $out/configs/${name}.yml
+    '') (attrNames config.services.mail-distributor.config)}
+  '';
 in
 {
   options = {
@@ -77,22 +80,11 @@ in
       description = "mail-distributor Daemon";
       serviceConfig = {
         ExecStart = ''
-          ${mail-distributor}/bin/mail-distributor ${toString config.services.mail-distributor.configDir}
+          ${mail-distributor}/bin/mail-distributor ${configDir}/configs
         '';
         Restart = "always";
         RestartSec = "5s";
       };
     };
-
-    # Generiere die Config-Dateien
-    systemd.tmpfiles.rules = map (file: {
-      type = "f";
-      path = "/etc/mail-distributor/${file}";
-      mode = "0644";
-      content = config.services.mail-distributor.config.${file};
-    }) (builtins.attrNames config.services.mail-distributor.config);
-
-    # Optional: Config-Ordner setzen
-    environment.variables.mail-distributor_CONFIG_DIR = "/etc/mail-distributor";
   };
 }
