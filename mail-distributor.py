@@ -10,10 +10,10 @@ from email import encoders
 import time
 import os
 import logging
+import yaml
 import configparser
+import argparse
 
-# Logging konfigurieren
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class IMAPConnection:
     def __init__(self, server, user, password, mailbox='inbox', max_retries=5, retry_delay=10):
@@ -40,7 +40,7 @@ class IMAPConnection:
             except Exception as e:
                 logging.warning(f"Verbindungsfehler: {e}. Warte {self.retry_delay} Sekunden...")
                 time.sleep(self.retry_delay)
-        
+
         logging.error("Maximale Anzahl an Verbindungsversuchen erreicht. Verbindung fehlgeschlagen.")
         self.connection = None
 
@@ -52,7 +52,7 @@ class IMAPConnection:
                 return  # Verbindung ist aktiv
             except Exception as e:
                 logging.warning(f"Verbindung verloren: {e}. Versuche erneut zu verbinden...")
-        
+
         # Verbindung erneut herstellen
         self.connect()
 
@@ -110,26 +110,29 @@ class IMAPConnection:
 class MailForwarder:
     def __init__(self, config_file):
         self.config = self.load_config(config_file)
+        imap_config = self.config['imap']
+        smtp_config = self.config['smtp']
+        forwarding_config = self.config['forwarding']
+
         self.imap = IMAPConnection(
-            server=self.config['IMAP']['SERVER'],
-            user=self.config['IMAP']['USER'],
-            password=self.read_password(self.config['IMAP']['PASSWORD_PATH']),
-            mailbox=self.config['IMAP'].get('MAILBOX', 'inbox')
+            server=imap_config['server'],
+            user=imap_config['user'],
+            password=self.read_password(imap_config['password_path']),
+            mailbox=imap_config.get('mailbox', 'inbox')
         )
-        self.smtp_user = self.config['SMTP']['USER']
-        self.smtp_password = self.read_password(self.config['SMTP']['PASSWORD_PATH'])
-        self.mail_from = self.config['SMTP']['MAIL_FROM']
-        self.smtp_server = self.config['SMTP']['SERVER']
-        self.smtp_port = int(self.config['SMTP']['PORT'])
-        self.forward_to = [recipient.strip() for recipient in self.config['FORWARDING']['RECIPIENTS'].split(',')]
-        self.allowed_senders = self.config['ALLOWED_SENDERS']['SENDERS'].split(',')
-        self.forwarder_name = self.config['GENERAL']['NAME']
+        self.smtp_user = smtp_config['user']
+        self.smtp_password = self.read_password(smtp_config['password_path'])
+        self.mail_from = smtp_config['mail_from']
+        self.smtp_server = smtp_config['server']
+        self.smtp_port = int(smtp_config['port'])
+        self.forward_to = forwarding_config['recipients']
+        self.allowed_senders = forwarding_config['allowed_senders']
+        self.forwarder_name = self.config['general']['name']
 
     def load_config(self, config_file):
         """Lädt die Konfigurationsdatei."""
-        config = configparser.ConfigParser()
-        config.read(config_file)
-        return config
+        with open(config_file, 'r') as f:
+            return yaml.safe_load(f)
 
     def read_password(self, password_path):
         """Liest ein Passwort aus einer Datei."""
@@ -152,7 +155,7 @@ class MailForwarder:
             part.decode(encoding or 'utf-8') if isinstance(part, bytes) else part
             for part, encoding in decode_header(from_header)
         )
-    
+
     def decode_subject(self, subject_header):
         """Dekodiert den Betreff aus einem E-Mail-Header."""
         if not subject_header:
@@ -274,7 +277,7 @@ class MailForwarder:
             if not raw_email:
                 logging.warning(f"Fehler beim Abrufen der E-Mail mit ID {mail_id}. Überspringe.")
                 continue
-            
+
             parsed_email = email.message_from_bytes(raw_email)
             from_email = parsed_email['From']
 
@@ -291,21 +294,34 @@ class MailForwarder:
         logging.info("Verarbeitung der E-Mails abgeschlossen.")
 
 
-def main(config_dir):
+def main(config_dir, sleep_duration):
     """Hauptprogramm für den Mail-Verteiler."""
-    config_files = [os.path.join(config_dir, f) for f in os.listdir(config_dir) if f.endswith('.ini')]
+    config_files = [os.path.join(config_dir, f) for f in os.listdir(config_dir) if f.endswith('.yaml')]
     forwarders = [MailForwarder(config_file) for config_file in config_files]
 
     while True:
         for forwarder in forwarders:
             forwarder.process_emails()
-        time.sleep(60)
+        time.sleep(sleep_duration)
 
 
 if __name__ == "__main__":
-    import sys
-    if len(sys.argv) != 2:
-        print("Nutzung: python mail_forwarder.py <config_verzeichnis>")
-        sys.exit(1)
-    config_directory = sys.argv[1]
-    main(config_directory)
+    parser = argparse.ArgumentParser(description="Mail Forwarding Script")
+    parser.add_argument("config_dir", help="Pfad zum Konfigurationsordner")
+    parser.add_argument("--log-level", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], default="INFO", help="Log-Level festlegen")
+    parser.add_argument("--sleep-duration", type=int, default=10, help="Pause zwischen den Verarbeitungszyklen (in Sekunden)")
+    args = parser.parse_args()
+
+    # Logging konfigurieren
+    log_level = getattr(logging, args.log_level.upper(), logging.INFO)
+    logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(message)s")
+
+    logging.info(f"Starte Mail Forwarding mit Log-Level: {args.log_level}")
+    logging.info(f"Verwende Konfigurationsordner: {args.config_dir}")
+    logging.info(f"Pause zwischen Verarbeitungszyklen: {args.sleep_duration} Sekunden")
+
+    try:
+        main(args.config_dir, args.sleep_duration)
+    except Exception as e:
+        logging.error(f"Ein schwerwiegender Fehler ist aufgetreten: {e}")
+        raise
