@@ -19,7 +19,7 @@ let
   configDir = pkgs.runCommand "mail-distributor-configs" { buildInputs = [ pkgs.makeWrapper ]; } ''
     mkdir -p $out
     ${concatMapStringsSep "\n" (name: ''
-      ln -s "${configFormat.generate "${name}.yml" (config.services.mail-distributor.config.${name})}" $out/${name}.yml
+      ln -s "${configFormat.generate "${name}.yaml" (config.services.mail-distributor.config.${name})}" $out/${name}.yaml
     '') (attrNames config.services.mail-distributor.config)}
   '';
 
