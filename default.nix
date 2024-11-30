@@ -16,9 +16,13 @@ let
   configFormat = pkgs.formats.yaml {};
 
   # Verzeichnis im Nix-Store für alle generierten Konfigurationsdateien
-  configDir = pkgs.runCommand "mail-distributor-configs" { buildInputs = [ pkgs.makeWrapper ]; } ''
+  configDir = pkgs.runCommand "mail-distributor-configs" {
+    buildInputs = [ pkgs.makeWrapper ];
+  } ''
     mkdir -p $out
+    # Iteriere über alle Konfigurationen und schreibe die generierten YAML-Dateien ins Output-Verzeichnis
     ${concatMapStringsSep "\n" (name: ''
+      # Generiere den YAML-Inhalt und schreibe ihn in die entsprechende Datei
       echo -n "${configFormat.generate "${name}.yml" (config.services.mail-distributor.config.${name})}" > $out/${name}.yml
     '') (attrNames config.services.mail-distributor.config)}
   '';
