@@ -7,8 +7,6 @@ let
   mail-distributor = pkgs.writers.writePython3Bin "mail-distributor" {
     libraries = with pkgs.python3Packages; [
       imaplib2
-      smtplib
-      email
       configparser
     ];
   } (builtins.readFile ./mail-distributor.py);
