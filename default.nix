@@ -20,10 +20,10 @@ let
     buildInputs = [ pkgs.makeWrapper ];
   } ''
     mkdir -p $out
-    # Iteriere über alle Konfigurationen und schreibe die generierten YAML-Dateien ins Output-Verzeichnis
+    # Iteriere über die Konfigurationen und schreibe deren Inhalt direkt in die Dateien
     ${concatMapStringsSep "\n" (name: ''
-      # Generiere den YAML-Inhalt und schreibe ihn in die entsprechende Datei
-      echo -n "${configFormat.generate "${name}.yml" (config.services.mail-distributor.config.${name})}" > $out/${name}.yml
+      # Lies den Inhalt der generierten Config-Datei und schreibe ihn direkt ins Ziel
+      cat "${configFormat.generate "${name}.yml" (config.services.mail-distributor.config.${name})}" > $out/${name}.yml
     '') (attrNames config.services.mail-distributor.config)}
   '';
 in
