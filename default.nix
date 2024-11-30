@@ -3,31 +3,31 @@
 with lib;
 
 let
-  # Python-Skript für den Verteiler
-  verteiler = pkgs.writers.writePython3Bin "verteiler" {
+  # Python-Skript für den mail-distributor
+  mail-distributor = pkgs.writers.writePython3Bin "mail-distributor" {
     libraries = with pkgs.python3Packages; [
       imaplib2
       smtplib
       email
       configparser
     ];
-  } (builtins.readFile ./verteiler.py);
+  } (builtins.readFile ./mail-distributor.py);
 
   # YAML-Format für die Generierung der Configs
   configFormat = pkgs.formats.yaml {};
 
-  # Funktion zum Generieren der Config-Dateien pro Verteiler
+  # Funktion zum Generieren der Config-Dateien pro mail-distributor
   configFiles = mapAttrsToList (name: cfg:
     configFormat.generate "${name}.yml" cfg
-  ) config.services.verteiler.config;
+  ) config.services.mail-distributor.config;
 in
 {
   options = {
-    services.verteiler = {
+    services.mail-distributor = {
       enable = mkOption {
         type = types.bool;
         default = false;
-        description = "Enable the verteiler service.";
+        description = "Enable the mail-distributor service.";
       };
 
       config = mkOption {
@@ -68,18 +68,18 @@ in
     };
   };
 
-  config = mkIf config.services.verteiler.enable {
+  config = mkIf config.services.mail-distributor.enable {
     # Stelle sicher, dass das Skript verfügbar ist
-    environment.systemPackages = [ verteiler ];
+    environment.systemPackages = [ mail-distributor ];
 
     # Systemd-Dienst für das Skript
-    systemd.services.verteiler = {
+    systemd.services.mail-distributor = {
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
-      description = "verteiler Daemon";
+      description = "mail-distributor Daemon";
       serviceConfig = {
         ExecStart = ''
-          ${verteiler}/bin/verteiler ${toString config.services.verteiler.configDir}
+          ${mail-distributor}/bin/mail-distributor ${toString config.services.mail-distributor.configDir}
         '';
         Restart = "always";
         RestartSec = "5s";
@@ -89,12 +89,12 @@ in
     # Generiere die Config-Dateien
     systemd.tmpfiles.rules = map (file: {
       type = "f";
-      path = "/etc/verteiler/${file}";
+      path = "/etc/mail-distributor/${file}";
       mode = "0644";
-      content = config.services.verteiler.config.${file};
-    }) (builtins.attrNames config.services.verteiler.config);
+      content = config.services.mail-distributor.config.${file};
+    }) (builtins.attrNames config.services.mail-distributor.config);
 
     # Optional: Config-Ordner setzen
-    environment.variables.verteiler_CONFIG_DIR = "/etc/verteiler";
+    environment.variables.mail-distributor_CONFIG_DIR = "/etc/mail-distributor";
   };
 }
