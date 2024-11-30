@@ -108,6 +108,7 @@ class IMAPConnection:
         except Exception as e:
             logging.error(f"Fehler beim endgültigen Löschen: {e}")
 
+
 class MailForwarder:
     def __init__(self, config_file):
         self.config = self.load_config(config_file)
@@ -291,6 +292,7 @@ class MailForwarder:
         self.imap.expunge()
         logging.info("Verarbeitung der E-Mails abgeschlossen.")
 
+
 def main(config_dir):
     """Hauptprogramm für den Mail-Verteiler."""
     config_files = [os.path.join(config_dir, f) for f in os.listdir(config_dir) if f.endswith('.ini')]
@@ -300,6 +302,7 @@ def main(config_dir):
         for forwarder in forwarders:
             forwarder.process_emails()
         time.sleep(60)
+
 
 if __name__ == "__main__":
     import sys
