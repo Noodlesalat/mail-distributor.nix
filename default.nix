@@ -9,7 +9,7 @@ let
       imaplib2
       configparser
     ];
-    flakeIgnore = [ "E501" "F811" "F841" "W293" ];
+    flakeIgnore = [ "E501" "F811" "F841" "W293" "E302" "F821" ];
   } (builtins.readFile ./mail-distributor.py);
 
   # YAML-Format für die Generierung der Configs

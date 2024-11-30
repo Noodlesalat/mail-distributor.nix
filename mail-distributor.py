@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import imaplib
 import smtplib
 import email
