@@ -7,7 +7,7 @@ let
   mail-distributor = pkgs.writers.writePython3Bin "mail-distributor" {
     libraries = with pkgs.python3Packages; [
       imaplib2
-      configparser
+      pyyaml
     ];
     flakeIgnore = [ "E501" "F811" "F841" "W293" "E302" "F821" ];
   } (builtins.readFile ./mail-distributor.py);
