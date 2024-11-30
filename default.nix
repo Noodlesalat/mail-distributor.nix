@@ -19,15 +19,15 @@ let
   # Funktion zum Generieren der Config-Dateien pro Verteiler
   configFiles = mapAttrsToList (name: cfg:
     configFormat.generate "${name}.yml" cfg
-  ) config.services.sms2mail.config;
+  ) config.services.verteiler.config;
 in
 {
   options = {
-    services.sms2mail = {
+    services.verteiler = {
       enable = mkOption {
         type = types.bool;
         default = false;
-        description = "Enable the sms2mail service.";
+        description = "Enable the verteiler service.";
       };
 
       config = mkOption {
@@ -68,18 +68,18 @@ in
     };
   };
 
-  config = mkIf config.services.sms2mail.enable {
+  config = mkIf config.services.verteiler.enable {
     # Stelle sicher, dass das Skript verfügbar ist
     environment.systemPackages = [ verteiler ];
 
     # Systemd-Dienst für das Skript
-    systemd.services.sms2mail = {
+    systemd.services.verteiler = {
       wantedBy = [ "multi-user.target" ];
       after = [ "network.target" ];
-      description = "sms2mail Daemon";
+      description = "verteiler Daemon";
       serviceConfig = {
         ExecStart = ''
-          ${verteiler}/bin/verteiler ${toString config.services.sms2mail.configDir}
+          ${verteiler}/bin/verteiler ${toString config.services.verteiler.configDir}
         '';
         Restart = "always";
         RestartSec = "5s";
@@ -89,12 +89,12 @@ in
     # Generiere die Config-Dateien
     systemd.tmpfiles.rules = map (file: {
       type = "f";
-      path = "/etc/sms2mail/${file}";
+      path = "/etc/verteiler/${file}";
       mode = "0644";
-      content = config.services.sms2mail.config.${file};
-    }) (builtins.attrNames config.services.sms2mail.config);
+      content = config.services.verteiler.config.${file};
+    }) (builtins.attrNames config.services.verteiler.config);
 
     # Optional: Config-Ordner setzen
-    environment.variables.SMS2MAIL_CONFIG_DIR = "/etc/sms2mail";
+    environment.variables.verteiler_CONFIG_DIR = "/etc/verteiler";
   };
 }
