@@ -295,7 +295,11 @@ class MailForwarder:
 
 def main(config_dir):
     """Hauptprogramm für den Mail-Verteiler."""
-    config_files = [os.path.join(config_dir, f) for f in os.listdir(config_dir) if f.endswith('.ini')]
+    config_files = [
+        os.path.join(config_dir, f)
+        for f in os.listdir(config_dir)
+        if f.endswith('.ini')
+    ]
     forwarders = [MailForwarder(config_file) for config_file in config_files]
 
     while True:
