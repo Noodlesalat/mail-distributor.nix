@@ -2,11 +2,8 @@ import imaplib
 import smtplib
 import email
 from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from email.mime.base import MIMEBase
 from email.utils import formataddr, formatdate, make_msgid
 from email.header import decode_header
-from email import encoders
 import time
 import os
 import logging
