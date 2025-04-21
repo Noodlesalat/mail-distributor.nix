@@ -95,6 +95,16 @@ class IMAPConnection:
         except Exception as e:
             logging.error(f"Fehler beim Löschen der E-Mail {mail_id}: {e}")
 
+    def mark_as_read(self, mail_id):
+        """Markiert eine E-Mail als gelesen."""
+        self.ensure_connection()
+        if not self.connection:
+            return
+        try:
+            self.connection.store(mail_id, '+FLAGS', '\\Seen')
+        except Exception as e:
+            logging.error(f"Fehler beim Markieren der E-Mail {mail_id} als gelesen: {e}")
+
     def expunge(self):
         """Entfernt endgültig gelöschte E-Mails."""
         self.ensure_connection()
@@ -165,53 +175,7 @@ class MailForwarder:
         )
 
     def create_forward_email(self, parsed_email, recipient):
-        """Erstellt eine weitergeleitete E-Mail."""
-        from_email = parsed_email['From']
-        decoded_from_email = self.decode_from_header(from_email)
-        subject = parsed_email['Subject']
-        decoded_subject = self.decode_from_header(subject)
-        original_name, original_address = email.utils.parseaddr(from_email)
-        message_id = make_msgid(domain=self.mail_from.split('@')[1])
-
-        logging.info(f"Bereite Weiterleitung vor für Absender: {decoded_from_email}, Betreff: {decoded_subject}")
-
-        msg = MIMEMultipart('mixed')
-        msg['From'] = formataddr((original_name, self.mail_from))
-        msg['To'] = recipient
-        msg['Subject'] = subject
-        msg['Date'] = formatdate(localtime=True)
-        msg['Message-ID'] = message_id
-        msg['Reply-To'] = from_email
-
-        # Füge alle Parts zur weitergeleiteten Nachricht hinzu
-        alternative_part = MIMEMultipart('alternative')
-        for part in email_parts:
-            content_type = part.get_content_type()
-            content_disposition = str(part.get("Content-Disposition", ""))
-            payload = part.get_payload(decode=True)
-            charset = part.get_content_charset() or 'utf-8'
-
-            if content_type == "text/plain" and "attachment" not in content_disposition:
-                alternative_part.attach(MIMEText(payload.decode(charset), 'plain'))
-            elif content_type == "text/html" and "attachment" not in content_disposition:
-                alternative_part.attach(MIMEText(payload.decode(charset), 'html'))
-            elif "attachment" in content_disposition:
-                filename = part.get_filename()
-                maintype, subtype = content_type.split('/')
-                attachment_part = MIMEBase(maintype, subtype)
-                attachment_part.set_payload(payload)
-                encoders.encode_base64(attachment_part)
-                attachment_part.add_header('Content-Disposition', f'attachment; filename="{filename}"')
-                msg.attach(attachment_part)
-
-        if len(alternative_part.get_payload()) > 0:
-            msg.attach(alternative_part)
-
-        return msg
-
-    def create_forward_email(self, parsed_email, recipient):
         """Erstellt eine weitergeleitete E-Mail, indem Body und Content-Type 1:1 übernommen werden."""
-        email_parts = list(parsed_email.walk())
         from_email = parsed_email['From']
         decoded_from_email = self.decode_from_header(from_email)
         subject = f"[{self.forwarder_name}] {parsed_email['Subject']}"
@@ -232,18 +196,20 @@ class MailForwarder:
             'Reply-To': from_email
         }
 
-        # Original-Body und Header direkt übernehmen
-        raw_body = parsed_email.get_payload(decode=False)  # Kein Decoding, wir übernehmen 1:1
-        content_type = parsed_email.get_content_type()
-        content_transfer_encoding = parsed_email.get("Content-Transfer-Encoding")
+        # Body dekodieren und charset berücksichtigen
+        payload_bytes = parsed_email.get_payload(decode=True)
+        charset = parsed_email.get_content_charset() or "utf-8"
+        try:
+            raw_body = payload_bytes.decode(charset, errors="replace")
+        except (LookupError, UnicodeDecodeError) as e:
+            logging.warning(f"Fehler beim Decodieren mit Charset '{charset}': {e}. Fallback zu utf-8.")
+            charset = "utf-8"
+            raw_body = payload_bytes.decode(charset, errors="replace")
 
-        # E-Mail erstellen
-        msg = MIMEBase(*content_type.split('/'))
-        msg.set_payload(raw_body)
+        content_type = parsed_email.get_content_type()  # z.B. text/html
 
-        # Header für den Body setzen
-        if content_transfer_encoding:
-            msg.add_header("Content-Transfer-Encoding", content_transfer_encoding)
+        # MIMEText verwenden – setzt charset automatisch korrekt im Content-Type
+        msg = MIMEText(raw_body, _subtype=content_type.split('/')[1], _charset=charset)
 
         # E-Mail-Header anhängen
         for header, value in email_headers.items():
@@ -281,13 +247,16 @@ class MailForwarder:
             from_email = parsed_email['From']
 
             if not self.is_allowed_sender(from_email):
-                logging.info(f"E-Mail von {self.decode_from_header(from_email)} ignoriert. Absender nicht erlaubt.")
+                decoded_sender = self.decode_from_header(from_email)
+                logging.info(f"E-Mail von {decoded_sender} ignoriert. Absender nicht erlaubt – wird gelöscht.")
+                self.imap.mark_as_deleted(mail_id)
                 continue
 
             for recipient in self.forward_to:
                 msg = self.create_forward_email(parsed_email, recipient)
                 self.send_email(msg, recipient)
-            self.imap.mark_as_deleted(mail_id)
+
+            self.imap.mark_as_read(mail_id)
 
         self.imap.expunge()
         logging.info("Verarbeitung der E-Mails abgeschlossen.")
