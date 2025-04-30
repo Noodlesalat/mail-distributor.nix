@@ -1,7 +1,7 @@
 import imaplib
 import smtplib
 import email
-from email.mime.text import MIMEText
+from email.message import EmailMessage
 from email.utils import formataddr, formatdate, make_msgid
 from email.header import decode_header
 import time
@@ -171,8 +171,9 @@ class MailForwarder:
             for part, encoding in decode_header(subject_header)
         )
 
+
     def create_forward_email(self, parsed_email, recipient):
-        """Erstellt eine weitergeleitete E-Mail, indem Body und Content-Type 1:1 übernommen werden."""
+        """Leitet die komplette E-Mail inkl. HTML und Anhängen weiter."""
         from_email = parsed_email['From']
         decoded_from_email = self.decode_from_header(from_email)
         subject = f"[{self.forwarder_name}] {parsed_email['Subject']}"
@@ -183,36 +184,19 @@ class MailForwarder:
 
         logging.info(f"Bereite Weiterleitung vor für Absender: {decoded_from_email}, Betreff: {decoded_subject}")
 
-        # E-Mail-Header setzen
-        email_headers = {
-            'From': formataddr((send_name, self.mail_from)),
-            'To': recipient,
-            'Subject': subject,
-            'Date': formatdate(localtime=True),
-            'Message-ID': message_id,
-            'Reply-To': from_email
-        }
+        # Original kopieren
+        forwarded = email.message_from_bytes(parsed_email.as_bytes())
 
-        # Body dekodieren und charset berücksichtigen
-        payload_bytes = parsed_email.get_payload(decode=True)
-        charset = parsed_email.get_content_charset() or "utf-8"
-        try:
-            raw_body = payload_bytes.decode(charset, errors="replace")
-        except (LookupError, UnicodeDecodeError) as e:
-            logging.warning(f"Fehler beim Decodieren mit Charset '{charset}': {e}. Fallback zu utf-8.")
-            charset = "utf-8"
-            raw_body = payload_bytes.decode(charset, errors="replace")
+        # Header ersetzen
+        forwarded.replace_header("Subject", subject)
+        forwarded.replace_header("From", formataddr((send_name, self.mail_from)))
+        forwarded.replace_header("To", recipient)
+        forwarded.add_header("Reply-To", from_email)
+        forwarded.replace_header("Date", formatdate(localtime=True))
+        forwarded.replace_header("Message-ID", message_id)
 
-        content_type = parsed_email.get_content_type()  # z.B. text/html
+        return forwarded
 
-        # MIMEText verwenden – setzt charset automatisch korrekt im Content-Type
-        msg = MIMEText(raw_body, _subtype=content_type.split('/')[1], _charset=charset)
-
-        # E-Mail-Header anhängen
-        for header, value in email_headers.items():
-            msg[header] = value
-
-        return msg
 
     def send_email(self, msg, recipient):
         """Sendet die erstellte E-Mail."""
