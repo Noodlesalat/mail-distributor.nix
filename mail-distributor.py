@@ -1,7 +1,6 @@
 import imaplib
 import smtplib
 import email
-from email.message import EmailMessage
 from email.utils import formataddr, formatdate, make_msgid
 from email.header import decode_header
 import time
@@ -171,7 +170,6 @@ class MailForwarder:
             for part, encoding in decode_header(subject_header)
         )
 
-
     def create_forward_email(self, parsed_email, recipient):
         """Leitet die komplette E-Mail inkl. HTML und Anhängen weiter."""
         from_email = parsed_email['From']
@@ -196,7 +194,6 @@ class MailForwarder:
         forwarded.replace_header("Message-ID", message_id)
 
         return forwarded
-
 
     def send_email(self, msg, recipient):
         """Sendet die erstellte E-Mail."""
