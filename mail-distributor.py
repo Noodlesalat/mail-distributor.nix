@@ -212,10 +212,10 @@ class MailForwarder:
 
     def process_emails(self):
         """Prozessiert ungelesene E-Mails."""
-        logging.info("Starte Verarbeitung neuer E-Mails.")
+        logging.debug("Starte Verarbeitung neuer E-Mails.")
         mail_ids = self.imap.fetch_unseen_emails()
         if not mail_ids:
-            logging.info("Keine ungelesenen E-Mails gefunden.")
+            logging.debug("Keine ungelesenen E-Mails gefunden.")
             return
 
         for mail_id in mail_ids:
