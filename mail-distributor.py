@@ -11,7 +11,9 @@ import argparse
 
 
 class IMAPConnection:
-    def __init__(self, server, user, password, mailbox='inbox', max_retries=5, retry_delay=10):
+    def __init__(
+        self, server, user, password, mailbox="inbox", max_retries=5, retry_delay=10
+    ):
         self.server = server
         self.user = user
         self.password = password
@@ -26,17 +28,23 @@ class IMAPConnection:
             try:
                 if self.connection:
                     self.connection.logout()
-                logging.info(f"Verbinden mit IMAP-Server: {self.server} (Versuch {attempt}/{self.max_retries})")
+                logging.info(
+                    f"Verbinden mit IMAP-Server: {self.server} (Versuch {attempt}/{self.max_retries})"
+                )
                 self.connection = imaplib.IMAP4_SSL(self.server)
                 self.connection.login(self.user, self.password)
                 self.connection.select(self.mailbox)
                 logging.info("IMAP-Verbindung erfolgreich hergestellt.")
                 return
             except Exception as e:
-                logging.warning(f"Verbindungsfehler: {e}. Warte {self.retry_delay} Sekunden...")
+                logging.warning(
+                    f"Verbindungsfehler: {e}. Warte {self.retry_delay} Sekunden..."
+                )
                 time.sleep(self.retry_delay)
 
-        logging.error("Maximale Anzahl an Verbindungsversuchen erreicht. Verbindung fehlgeschlagen.")
+        logging.error(
+            "Maximale Anzahl an Verbindungsversuchen erreicht. Verbindung fehlgeschlagen."
+        )
         self.connection = None
 
     def ensure_connection(self):
@@ -46,7 +54,9 @@ class IMAPConnection:
                 self.connection.noop()
                 return  # Verbindung ist aktiv
             except Exception as e:
-                logging.warning(f"Verbindung verloren: {e}. Versuche erneut zu verbinden...")
+                logging.warning(
+                    f"Verbindung verloren: {e}. Versuche erneut zu verbinden..."
+                )
 
         # Verbindung erneut herstellen
         self.connect()
@@ -58,7 +68,7 @@ class IMAPConnection:
             logging.error("Keine Verbindung verfügbar. Überspringe Abruf.")
             return []
         try:
-            status, messages = self.connection.search(None, '(UNSEEN)')
+            status, messages = self.connection.search(None, "(UNSEEN)")
             if status != "OK":
                 logging.error(f"IMAP-Fehler bei der Suche: {status}")
                 return []
@@ -73,7 +83,7 @@ class IMAPConnection:
         if not self.connection:
             return None
         try:
-            status, msg_data = self.connection.fetch(mail_id, '(RFC822)')
+            status, msg_data = self.connection.fetch(mail_id, "(RFC822)")
             if status == "OK":
                 return msg_data[0][1]
             logging.error(f"IMAP-Fehler beim Abrufen der E-Mail: {status}")
@@ -87,7 +97,7 @@ class IMAPConnection:
         if not self.connection:
             return
         try:
-            self.connection.store(mail_id, '+FLAGS', '\\Deleted')
+            self.connection.store(mail_id, "+FLAGS", "\\Deleted")
         except Exception as e:
             logging.error(f"Fehler beim Löschen der E-Mail {mail_id}: {e}")
 
@@ -97,9 +107,11 @@ class IMAPConnection:
         if not self.connection:
             return
         try:
-            self.connection.store(mail_id, '+FLAGS', '\\Seen')
+            self.connection.store(mail_id, "+FLAGS", "\\Seen")
         except Exception as e:
-            logging.error(f"Fehler beim Markieren der E-Mail {mail_id} als gelesen: {e}")
+            logging.error(
+                f"Fehler beim Markieren der E-Mail {mail_id} als gelesen: {e}"
+            )
 
     def expunge(self):
         """Entfernt endgültig gelöschte E-Mails."""
@@ -115,34 +127,34 @@ class IMAPConnection:
 class MailForwarder:
     def __init__(self, config_file):
         self.config = self.load_config(config_file)
-        imap_config = self.config['imap']
-        smtp_config = self.config['smtp']
-        forwarding_config = self.config['forwarding']
+        imap_config = self.config["imap"]
+        smtp_config = self.config["smtp"]
+        forwarding_config = self.config["forwarding"]
 
         self.imap = IMAPConnection(
-            server=imap_config['server'],
-            user=imap_config['user'],
-            password=self.read_password(imap_config['password_path']),
-            mailbox=imap_config.get('mailbox', 'inbox')
+            server=imap_config["server"],
+            user=imap_config["user"],
+            password=self.read_password(imap_config["password_path"]),
+            mailbox=imap_config.get("mailbox", "inbox"),
         )
-        self.smtp_user = smtp_config['user']
-        self.smtp_password = self.read_password(smtp_config['password_path'])
-        self.mail_from = smtp_config['mail_from']
-        self.smtp_server = smtp_config['server']
-        self.smtp_port = int(smtp_config['port'])
-        self.forward_to = forwarding_config['recipients']
-        self.allowed_senders = forwarding_config['allowed_senders']
-        self.forwarder_name = self.config['general']['name']
+        self.smtp_user = smtp_config["user"]
+        self.smtp_password = self.read_password(smtp_config["password_path"])
+        self.mail_from = smtp_config["mail_from"]
+        self.smtp_server = smtp_config["server"]
+        self.smtp_port = int(smtp_config["port"])
+        self.forward_to = forwarding_config["recipients"]
+        self.allowed_senders = forwarding_config["allowed_senders"]
+        self.forwarder_name = self.config["general"]["name"]
 
     def load_config(self, config_file):
         """Lädt die Konfigurationsdatei."""
-        with open(config_file, 'r') as f:
+        with open(config_file, "r") as f:
             return yaml.safe_load(f)
 
     def read_password(self, password_path):
         """Liest ein Passwort aus einer Datei."""
         try:
-            with open(password_path, 'r') as f:
+            with open(password_path, "r") as f:
                 return f.read().strip()
         except Exception as e:
             logging.error(f"Fehler beim Lesen des Passworts: {e}")
@@ -150,14 +162,14 @@ class MailForwarder:
 
     def is_allowed_sender(self, from_email):
         """Prüft, ob ein Absender erlaubt ist."""
-        if '<' in from_email and '>' in from_email:
-            from_email = from_email.split('<')[1].split('>')[0].strip()
+        if "<" in from_email and ">" in from_email:
+            from_email = from_email.split("<")[1].split(">")[0].strip()
         return from_email.lower() in [s.lower() for s in self.allowed_senders]
 
     def decode_from_header(self, from_header):
         """Dekodiert einen From-Header."""
-        return ''.join(
-            part.decode(encoding or 'utf-8') if isinstance(part, bytes) else part
+        return "".join(
+            part.decode(encoding or "utf-8") if isinstance(part, bytes) else part
             for part, encoding in decode_header(from_header)
         )
 
@@ -165,22 +177,24 @@ class MailForwarder:
         """Dekodiert den Betreff aus einem E-Mail-Header."""
         if not subject_header:
             return ""
-        return ''.join(
-            part.decode(encoding or 'utf-8') if isinstance(part, bytes) else part
+        return "".join(
+            part.decode(encoding or "utf-8") if isinstance(part, bytes) else part
             for part, encoding in decode_header(subject_header)
         )
 
     def create_forward_email(self, parsed_email, recipient):
         """Leitet die komplette E-Mail inkl. HTML und Anhängen weiter."""
-        from_email = parsed_email['From']
+        from_email = parsed_email["From"]
         decoded_from_email = self.decode_from_header(from_email)
         subject = f"[{self.forwarder_name}] {parsed_email['Subject']}"
         decoded_subject = self.decode_from_header(subject)
         original_name, original_address = email.utils.parseaddr(from_email)
-        message_id = make_msgid(domain=self.mail_from.split('@')[1])
+        message_id = make_msgid(domain=self.mail_from.split("@")[1])
         send_name = f"{original_name} via Verteiler"
 
-        logging.info(f"Bereite Weiterleitung vor für Absender: {decoded_from_email}, Betreff: {decoded_subject}")
+        logging.info(
+            f"Bereite Weiterleitung vor für Absender: {decoded_from_email}, Betreff: {decoded_subject}"
+        )
 
         # Original kopieren
         forwarded = email.message_from_bytes(parsed_email.as_bytes())
@@ -198,7 +212,9 @@ class MailForwarder:
     def send_email(self, msg, recipient):
         """Sendet die erstellte E-Mail."""
         try:
-            logging.info(f"Versende E-Mail an {recipient} über {self.smtp_server}:{self.smtp_port}.")
+            logging.info(
+                f"Versende E-Mail an {recipient} über {self.smtp_server}:{self.smtp_port}."
+            )
             with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
                 server.starttls()
                 server.login(self.smtp_user, self.smtp_password)
@@ -218,15 +234,19 @@ class MailForwarder:
         for mail_id in mail_ids:
             raw_email = self.imap.fetch_email(mail_id)
             if not raw_email:
-                logging.warning(f"Fehler beim Abrufen der E-Mail mit ID {mail_id}. Überspringe.")
+                logging.warning(
+                    f"Fehler beim Abrufen der E-Mail mit ID {mail_id}. Überspringe."
+                )
                 continue
 
             parsed_email = email.message_from_bytes(raw_email)
-            from_email = parsed_email['From']
+            from_email = parsed_email["From"]
 
             if not self.is_allowed_sender(from_email):
                 decoded_sender = self.decode_from_header(from_email)
-                logging.info(f"E-Mail von {decoded_sender} ignoriert. Absender nicht erlaubt – wird gelöscht.")
+                logging.info(
+                    f"E-Mail von {decoded_sender} ignoriert. Absender nicht erlaubt – wird gelöscht."
+                )
                 self.imap.mark_as_deleted(mail_id)
                 continue
 
@@ -242,7 +262,11 @@ class MailForwarder:
 
 def main(config_dir, sleep_duration):
     """Hauptprogramm für den Mail-Verteiler."""
-    config_files = [os.path.join(config_dir, f) for f in os.listdir(config_dir) if f.endswith('.yaml')]
+    config_files = [
+        os.path.join(config_dir, f)
+        for f in os.listdir(config_dir)
+        if f.endswith(".yaml")
+    ]
     forwarders = [MailForwarder(config_file) for config_file in config_files]
 
     while True:
@@ -254,13 +278,25 @@ def main(config_dir, sleep_duration):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Mail Forwarding Script")
     parser.add_argument("config_dir", help="Pfad zum Konfigurationsordner")
-    parser.add_argument("--log-level", choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'], default="INFO", help="Log-Level festlegen")
-    parser.add_argument("--sleep-duration", type=int, default=10, help="Pause zwischen den Verarbeitungszyklen (in Sekunden)")
+    parser.add_argument(
+        "--log-level",
+        choices=["DEBUG", "INFO", "WARNING", "ERROR"],
+        default="INFO",
+        help="Log-Level festlegen",
+    )
+    parser.add_argument(
+        "--sleep-duration",
+        type=int,
+        default=10,
+        help="Pause zwischen den Verarbeitungszyklen (in Sekunden)",
+    )
     args = parser.parse_args()
 
     # Logging konfigurieren
     log_level = getattr(logging, args.log_level.upper(), logging.INFO)
-    logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(message)s")
+    logging.basicConfig(
+        level=log_level, format="%(asctime)s - %(levelname)s - %(message)s"
+    )
 
     logging.info(f"Starte Mail Forwarding mit Log-Level: {args.log_level}")
     logging.info(f"Verwende Konfigurationsordner: {args.config_dir}")
